@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Binance Futures Trader</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="backdrop"></div>
+    <div class="shell">
+      <header class="hero panel">
+        <div>
+          <p class="eyebrow">Local-Only Trading Console</p>
+          <h1>Binance Futures Trader</h1>
+          <p class="hero-copy">
+            本地网页面板，用来配置 API、查看合约账户，并手动提交限价单。
+          </p>
+        </div>
+        <div class="hero-status">
+          <span class="status-pill" id="mode-pill">加载中</span>
+          <span class="status-pill subdued">本地控制台</span>
+          <span class="status-pill subdued" id="credential-pill">未配置 API</span>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="panel config-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Step 1</p>
+              <h2>连接配置</h2>
+            </div>
+            <button class="ghost-button" id="reload-config" type="button">重新读取</button>
+          </div>
+
+          <form id="config-form" class="stack-form">
+            <label>
+              <span>API Key</span>
+              <input id="api-key" name="apiKey" autocomplete="off" placeholder="输入后可保存到 .env" />
+            </label>
+            <label>
+              <span>API Secret</span>
+              <input
+                id="api-secret"
+                name="apiSecret"
+                type="password"
+                autocomplete="off"
+                placeholder="仅在本地发送到当前服务"
+              />
+            </label>
+
+            <div class="form-grid">
+              <label>
+                <span>交易环境</span>
+                <select id="environment-select" name="environment">
+                  <option value="mainnet">正式盘</option>
+                  <option value="testnet">测试网</option>
+                  <option value="custom">自定义</option>
+                </select>
+              </label>
+              <label>
+                <span>Futures Base URL</span>
+                <input id="base-url" name="baseUrl" autocomplete="off" />
+              </label>
+              <label>
+                <span>recvWindow</span>
+                <input id="recv-window" name="recvWindow" type="number" min="1" step="1" />
+              </label>
+            </div>
+
+            <div class="toggle-row">
+              <label class="toggle">
+                <input id="dry-run" name="dryRun" type="checkbox" />
+                <span>Dry Run 模式</span>
+              </label>
+              <label class="toggle">
+                <input id="save-config" name="saveConfig" type="checkbox" checked />
+                <span>保存到 `.env`</span>
+              </label>
+            </div>
+
+            <div class="button-row">
+              <button class="accent-button" type="submit">保存并连接</button>
+              <button class="ghost-button" id="test-connection" type="button">测试连接</button>
+              <button class="ghost-button" id="refresh-account" type="button">刷新账户</button>
+            </div>
+
+            <p class="hint" id="config-hint">Key 和 Secret 不会回显到页面，只显示是否已配置。多账户请在服务器 .env 配置 TRADER_ACCOUNTS_JSON。</p>
+          </form>
+
+          <div class="multi-account-box">
+            <div class="panel-tools auto-trade-tools">
+              <strong>多账户 API</strong>
+              <button class="ghost-button compact-button" id="add-account" type="button">添加账户</button>
+              <button class="accent-button compact-button" id="save-accounts" type="button">保存多账户</button>
+            </div>
+            <div class="account-config-list" id="account-config-list"></div>
+            <p class="hint" id="accounts-hint">
+              保存后会写入 TRADER_ACCOUNTS_JSON；自动交易读取新账户需要重启服务。
+            </p>
+          </div>
+        </section>
+
+        <section class="panel account-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Step 2</p>
+              <h2>账户概览</h2>
+            </div>
+            <div class="panel-tools">
+              <span class="quiet-pill live" id="live-pill">实时刷新 3s</span>
+              <button class="ghost-button compact-button" id="auto-refresh-toggle" type="button">暂停</button>
+              <p class="micro-copy" id="account-updated-at">尚未加载</p>
+            </div>
+          </div>
+
+          <div class="metric-grid" id="metrics"></div>
+          <div class="note-strip" id="account-notes"></div>
+        </section>
+
+        <section class="panel assets-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Balances</p>
+              <h2>资产余额</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>资产</th>
+                  <th>钱包余额</th>
+                  <th>可用余额</th>
+                  <th>未实现盈亏</th>
+                </tr>
+              </thead>
+              <tbody id="assets-body">
+                <tr><td colspan="4" class="empty-cell">暂无数据</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel positions-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Positions</p>
+              <h2>当前持仓</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>合约</th>
+                  <th>方向</th>
+                  <th>数量</th>
+                  <th>开仓价</th>
+                  <th>标记价</th>
+                  <th>杠杆</th>
+                  <th>模式</th>
+                  <th>未实现盈亏</th>
+                </tr>
+              </thead>
+              <tbody id="positions-body">
+                <tr><td colspan="8" class="empty-cell">暂无持仓</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel auto-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Auto Scan</p>
+              <h2>自动拉取分析</h2>
+            </div>
+            <div class="panel-tools">
+              <button class="ghost-button compact-button" id="refresh-auto-scan" type="button">刷新自动分析</button>
+              <p class="micro-copy" id="auto-scan-updated-at">尚未加载</p>
+            </div>
+          </div>
+          <div class="auto-summary" id="auto-scan-summary">暂无自动分析</div>
+          <div class="auto-candidates" id="auto-candidates"></div>
+
+          <div class="auto-trade-box">
+            <div class="panel-tools auto-trade-tools">
+              <strong>真实盘自动交易</strong>
+              <button class="ghost-button compact-button" id="refresh-auto-trade" type="button">刷新状态</button>
+              <button class="ghost-button compact-button" id="run-auto-trade" type="button">手动跑一轮</button>
+            </div>
+            <div class="auto-summary" id="auto-trade-status">自动交易状态未加载</div>
+            <div class="auto-candidates" id="auto-trade-trades"></div>
+          </div>
+        </section>
+
+        <section class="panel strategy-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Strategy Diagnostics</p>
+              <h2>策略诊断</h2>
+            </div>
+            <div class="panel-tools">
+              <button class="ghost-button compact-button" id="refresh-strategy" type="button">刷新诊断</button>
+              <p class="micro-copy" id="strategy-updated-at">尚未加载</p>
+            </div>
+          </div>
+          <div class="auto-summary" id="strategy-summary">暂无策略诊断</div>
+          <div class="auto-candidates" id="strategy-details"></div>
+        </section>
+
+        <section class="panel analysis-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Analysis</p>
+              <h2>合约分析</h2>
+            </div>
+            <div class="panel-tools analysis-tools">
+              <input id="analysis-symbol" list="symbol-list" placeholder="BTCUSDT" autocomplete="off" />
+              <button class="ghost-button compact-button" id="refresh-analysis" type="button">刷新分析</button>
+              <p class="micro-copy" id="analysis-updated-at">尚未加载</p>
+            </div>
+          </div>
+
+          <div class="chip-row" id="analysis-position-chips"></div>
+          <div class="analysis-signal" id="analysis-signal">暂无分析</div>
+          <div class="analysis-grid" id="analysis-grid"></div>
+          <div class="analysis-reasons" id="analysis-reasons"></div>
+
+          <div class="square-box">
+            <label>
+              <span>币安广场文本/链接</span>
+              <textarea
+                id="square-text"
+                rows="4"
+                placeholder="粘贴币安广场帖子文字或链接，V1 只分析你粘贴的内容"
+              ></textarea>
+            </label>
+            <div class="button-row">
+              <button class="ghost-button" id="refresh-square-today" type="button">刷新今日广场</button>
+              <button class="ghost-button" id="analyze-square" type="button">分析广场内容</button>
+            </div>
+            <div class="square-result" id="square-result">暂无广场参考</div>
+          </div>
+        </section>
+
+        <section class="panel order-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Step 3</p>
+              <h2>手动下单</h2>
+            </div>
+            <p class="micro-copy">限价单 + 手动杠杆</p>
+          </div>
+
+          <form id="order-form" class="stack-form">
+            <div class="form-grid order-grid">
+              <label>
+                <span>交易方向</span>
+                <select id="intent" name="intent">
+                  <option value="open_long">开多</option>
+                  <option value="open_short">开空</option>
+                  <option value="close_long">平多</option>
+                  <option value="close_short">平空</option>
+                </select>
+              </label>
+              <label>
+                <span>交易对</span>
+                <input id="symbol" name="symbol" list="symbol-list" placeholder="BTCUSDT" autocomplete="off" />
+                <datalist id="symbol-list"></datalist>
+              </label>
+              <label>
+                <span id="size-label">保证金</span>
+                <input id="size-input" name="sizeInput" placeholder="10" autocomplete="off" />
+              </label>
+              <label>
+                <span>限价</span>
+                <input id="price" name="price" placeholder="65000.1" autocomplete="off" />
+              </label>
+              <label id="leverage-field">
+                <span>杠杆</span>
+                <input id="leverage" name="leverage" type="number" min="1" max="125" step="1" value="10" />
+              </label>
+            </div>
+
+            <p class="field-note" id="size-hint">
+              开仓时输入保证金，系统会按 保证金 × 杠杆 / 限价 自动换算下单数量。
+            </p>
+            <div class="analysis-reference" id="order-analysis-note">暂无参考分析</div>
+
+            <div class="button-row">
+              <button class="ghost-button" id="preview-order" type="button">预览订单</button>
+              <button class="accent-button" id="submit-order" type="submit">提交订单</button>
+            </div>
+          </form>
+
+          <div class="preview-box" id="preview-box">
+            <p class="preview-empty">先点击“预览订单”，这里会显示规范化后的下单请求。</p>
+          </div>
+        </section>
+
+        <section class="panel log-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Activity</p>
+              <h2>操作日志</h2>
+            </div>
+            <button class="ghost-button" id="clear-log" type="button">清空</button>
+          </div>
+          <div class="log-list" id="log-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

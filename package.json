@@ -1,0 +1,17 @@
+{
+  "name": "binance-activity-monitor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Monitor Binance account activity and send alerts to chat tools.",
+  "scripts": {
+    "start": "node --env-file=.env src/index.mjs",
+    "dev": "node --env-file=.env --watch src/index.mjs",
+    "trader": "node --env-file=.env src/trader/webServer.mjs",
+    "trader:cli": "node --env-file=.env src/trader/index.mjs",
+    "test": "node --test --test-isolation=none"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
