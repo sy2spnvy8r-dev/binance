@@ -100,6 +100,8 @@ function pickAccountAutoTradeOverrides(account) {
     "trailingCallbackRate",
     "regimeGateEnabled",
     "regimeSymbol",
+    "regimeConflictOverrideConfidence",
+    "regimeConflictMarginScale",
     "shadowModeEnabled",
     "auditEnabled",
     "shadowFeeRate",
@@ -214,6 +216,14 @@ export function loadTraderConfig(argv = process.argv.slice(2)) {
       trailingCallbackRate: readOptionalNumber("AUTO_TRADE_TRAILING_CALLBACK_RATE", 0.8),
       regimeGateEnabled: readBoolean("AUTO_TRADE_REGIME_GATE_ENABLED", true),
       regimeSymbol: readOptional("AUTO_TRADE_REGIME_SYMBOL", "BTCUSDT"),
+      regimeConflictOverrideConfidence: readOptionalNumber(
+        "AUTO_TRADE_REGIME_CONFLICT_OVERRIDE_CONFIDENCE",
+        75,
+      ),
+      regimeConflictMarginScale: readOptionalNumber(
+        "AUTO_TRADE_REGIME_CONFLICT_MARGIN_SCALE",
+        0.5,
+      ),
       shadowModeEnabled: readBoolean("AUTO_TRADE_SHADOW_MODE_ENABLED", true),
       auditEnabled: readBoolean("AUTO_TRADE_AUDIT_ENABLED", true),
       shadowStateFile: path.resolve(

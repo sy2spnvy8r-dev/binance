@@ -63,6 +63,32 @@ test("buildStrategyRegime blocks conflicting trend candidates", () => {
   assert.match(regime.reasons[0], /冲突/);
 });
 
+test("buildStrategyRegime allows high-confidence conflict as small position", () => {
+  const regime = buildStrategyRegime({
+    analysis: baseAnalysis({
+      signal: "偏空",
+      longShortRatio: {
+        "5m": { longShortRatio: "0.8" },
+        "1h": { longShortRatio: "0.8" },
+      },
+      topTraderRatio: {
+        "5m": { longShortRatio: "0.8" },
+        "1h": { longShortRatio: "0.8" },
+      },
+      takerBuySell: {
+        "5m": { buySellRatio: "0.8" },
+        "1h": { buySellRatio: "0.8" },
+      },
+    }),
+    candidate: { symbol: "BTCUSDT", action: "open_long", confidence: 88 },
+  });
+
+  assert.equal(regime.state, "趋势空");
+  assert.equal(regime.allowNewTrade, true);
+  assert.equal(regime.marginScale, 0.5);
+  assert.match(regime.reasons[0], /允许小仓/);
+});
+
 test("buildStrategyRegime allows small-margin entries in chop", () => {
   const regime = buildStrategyRegime({
     analysis: baseAnalysis({

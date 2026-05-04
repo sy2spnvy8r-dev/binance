@@ -214,6 +214,25 @@ function getMinOrderMarginUsdt(config) {
   return Number.isFinite(parsed) && parsed > 0 ? formatUsdt(parsed) : "0";
 }
 
+function getCandidateMarginScale(candidate) {
+  const parsed = Number(candidate?.regimeGate?.marginScale ?? 1);
+  return Number.isFinite(parsed) && parsed > 0 && parsed < 1 ? parsed : 1;
+}
+
+function scaleOrderMarginUsdt(orderMarginUsdt, minOrderMarginUsdt, scale = 1) {
+  if (scale >= 1) {
+    return orderMarginUsdt;
+  }
+
+  const scaled = Number(orderMarginUsdt) * scale;
+  const minimum = Number(minOrderMarginUsdt);
+  if (!Number.isFinite(scaled) || scaled <= 0) {
+    return orderMarginUsdt;
+  }
+
+  return formatUsdt(Math.max(Number.isFinite(minimum) ? minimum : 0, scaled));
+}
+
 function getMaxTotalRiskUsdt(config) {
   const parsed = Number(config?.maxTotalRiskUsdt ?? 30);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : Infinity;
@@ -1392,11 +1411,17 @@ export class AutoTradeService {
     }
 
     const { availableCapitalUsdt } = this.getAvailableCapital();
-    const orderMarginUsdt = getOrderMarginUsdt(this.config, availableCapitalUsdt);
+    const baseOrderMarginUsdt = getOrderMarginUsdt(this.config, availableCapitalUsdt);
     const minOrderMarginUsdt = getMinOrderMarginUsdt(this.config);
-    if (compareDecimalStrings(orderMarginUsdt, minOrderMarginUsdt) < 0) {
+    if (compareDecimalStrings(baseOrderMarginUsdt, minOrderMarginUsdt) < 0) {
       return { ok: false, skipped: true, reason: "自动交易资金池暂无可用资金。" };
     }
+    const marginScale = getCandidateMarginScale(candidate);
+    const orderMarginUsdt = scaleOrderMarginUsdt(
+      baseOrderMarginUsdt,
+      minOrderMarginUsdt,
+      marginScale,
+    );
 
     const exchangeInfo = await this.runtime.getExchangeInfo();
     const symbolInfo = getSymbolInfo(buildSymbolIndex(exchangeInfo), candidate.symbol);
@@ -1466,6 +1491,7 @@ export class AutoTradeService {
         action: intent,
         confidence: getConfidence(candidate),
         marginUsdt: actualMarginUsdt,
+        marginScale,
         notionalUsdt: order.actualNotional,
         riskUsdt,
         quantity: order.quantity,

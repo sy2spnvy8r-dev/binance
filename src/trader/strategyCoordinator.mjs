@@ -35,7 +35,14 @@ export class StrategyCoordinator {
 
     try {
       const analysis = await this.runtime.getMarketAnalysis({ symbol, forceRefresh });
-      const regime = buildStrategyRegime({ analysis, candidate });
+      const regime = buildStrategyRegime({
+        analysis,
+        candidate,
+        options: {
+          conflictOverrideConfidence: this.config.regimeConflictOverrideConfidence,
+          conflictMarginScale: this.config.regimeConflictMarginScale,
+        },
+      });
       this.lastRegimeGate = regime;
       return regime;
     } catch (error) {

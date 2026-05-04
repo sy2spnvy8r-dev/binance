@@ -2,6 +2,8 @@ const TREND_LONG = "趋势多";
 const TREND_SHORT = "趋势空";
 const CHOP = "震荡";
 const RISK_OFF = "风险关闭";
+const DEFAULT_CONFLICT_OVERRIDE_CONFIDENCE = 75;
+const DEFAULT_CONFLICT_MARGIN_SCALE = 0.5;
 
 function toNumber(value) {
   const parsed = Number(value);
@@ -22,11 +24,24 @@ function actionDirection(action) {
   return null;
 }
 
+function confidenceValue(candidate) {
+  return toNumber(candidate?.confidence ?? candidate?.localScore);
+}
+
+function normalizeMarginScale(value) {
+  const parsed = toNumber(value);
+  if (parsed === null || parsed <= 0 || parsed >= 1) {
+    return DEFAULT_CONFLICT_MARGIN_SCALE;
+  }
+
+  return parsed;
+}
+
 function unique(items) {
   return Array.from(new Set(items.filter(Boolean)));
 }
 
-export function buildStrategyRegime({ analysis, candidate } = {}) {
+export function buildStrategyRegime({ analysis, candidate, options = {} } = {}) {
   const reasons = [];
   const riskReasons = [];
   let score = 0;
@@ -122,6 +137,11 @@ export function buildStrategyRegime({ analysis, candidate } = {}) {
 
   const direction = actionDirection(candidate?.action || candidate?.intent);
   let allowNewTrade = state !== RISK_OFF;
+  let marginScale = 1;
+  const candidateConfidence = confidenceValue(candidate);
+  const conflictOverrideConfidence =
+    toNumber(options.conflictOverrideConfidence) ?? DEFAULT_CONFLICT_OVERRIDE_CONFIDENCE;
+  const conflictMarginScale = normalizeMarginScale(options.conflictMarginScale);
   const gateReasons = [];
 
   if (state === RISK_OFF) {
@@ -132,8 +152,16 @@ export function buildStrategyRegime({ analysis, candidate } = {}) {
       allowNewTrade = true;
       gateReasons.push("震荡状态，允许按小保证金试仓");
     } else if (direction !== state) {
-      allowNewTrade = false;
-      gateReasons.push(`候选方向 ${direction} 与市场状态 ${state} 冲突`);
+      if (candidateConfidence !== null && candidateConfidence >= conflictOverrideConfidence) {
+        allowNewTrade = true;
+        marginScale = conflictMarginScale;
+        gateReasons.push(
+          `候选方向 ${direction} 与市场状态 ${state} 冲突，但信心 ${candidateConfidence} >= ${conflictOverrideConfidence}，允许小仓试单`,
+        );
+      } else {
+        allowNewTrade = false;
+        gateReasons.push(`候选方向 ${direction} 与市场状态 ${state} 冲突`);
+      }
     } else {
       gateReasons.push(`候选方向与市场状态 ${state} 匹配`);
     }
@@ -145,6 +173,7 @@ export function buildStrategyRegime({ analysis, candidate } = {}) {
     riskScore: Math.min(100, Math.round(riskScore)),
     trendScore: Number(score.toFixed(2)),
     allowNewTrade,
+    marginScale,
     candidateAction: candidate?.action || candidate?.intent || null,
     reasons: unique([...gateReasons, ...riskReasons, ...reasons]).slice(0, 8),
     updatedAt: new Date().toISOString(),
